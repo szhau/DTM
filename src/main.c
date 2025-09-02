@@ -14,10 +14,9 @@
 /* External function from dtm_cmd_core */
 extern uint16_t dtm_cmd_put(uint16_t cmd);
 
-/* Set to 1 to enable auto-start TX mode on channel 5 */
-#define AUTO_START_TX_MODE 1
+/* Set to 1 to enable auto-start RX mode on channel 5 */
+#define AUTO_START_RX_MODE 1
 #define AUTO_START_CHANNEL 5  /* Channel 5 = 2410 MHz */
-#define AUTO_START_TX_POWER 3 /* TX power in dBm */
 
 int main(void)
 {
@@ -26,8 +25,8 @@ int main(void)
 
 	printk("Starting Direct Test Mode with Shell Interface\n");
 
-#if AUTO_START_TX_MODE
-	SEGGER_RTT_WriteString(0, "Auto-start TX mode enabled on channel 5\n");
+#if AUTO_START_RX_MODE
+	SEGGER_RTT_WriteString(0, "Auto-start RX mode enabled on channel 5\n");
 #endif
 
 	err = dtm_tr_init();
@@ -39,9 +38,9 @@ int main(void)
 	printk("DTM Ready - Shell commands available\n");
 	printk("Type 'dtm' to see available commands\n");
 
-#if AUTO_START_TX_MODE
-	/* Auto-start TX carrier mode */
-	printk("Auto-starting TX carrier on channel %d (%.0f MHz)\n", 
+#if AUTO_START_RX_MODE
+	/* Auto-start RX mode */
+	printk("Auto-starting RX on channel %d (%.0f MHz)\n", 
 	       AUTO_START_CHANNEL, 2402.0 + AUTO_START_CHANNEL * 2);
 	
 	/* Wait for system to stabilize */
@@ -54,33 +53,26 @@ int main(void)
 	
 	k_sleep(K_MSEC(50));
 	
-	/* Set TX power */
-	response = dtm_cmd_put(0x0200 | (AUTO_START_TX_POWER << 2));
-	printk("Set TX Power to %d dBm - Response: 0x%04X\n", AUTO_START_TX_POWER, response);
-	SEGGER_RTT_WriteString(0, "TX Power set to target level\n");
-	
-	k_sleep(K_MSEC(50));
-	
-	/* Start TX carrier on configured channel
-	 * TX carrier command: bits 15-14 = 0x2 (TRANSMITTER_TEST)
-	 * For carrier test, length = 0 (vendor specific for continuous carrier)
+	/* Start RX on configured channel
+	 * RX command: bits 15-14 = 0x1 (RECEIVER_TEST)
+	 * Channel is specified in bits 7-2
 	 */
-	uint16_t tx_cmd = 0x8000 | (AUTO_START_CHANNEL << 2);
-	response = dtm_cmd_put(tx_cmd);
-	printk("TX Carrier started on channel %d (%.0f MHz) - Response: 0x%04X\n", 
+	uint16_t rx_cmd = 0x4000 | (AUTO_START_CHANNEL << 2);
+	response = dtm_cmd_put(rx_cmd);
+	printk("RX started on channel %d (%.0f MHz) - Response: 0x%04X\n", 
 	       AUTO_START_CHANNEL, 2402.0 + AUTO_START_CHANNEL * 2, response);
 	
 	SEGGER_RTT_WriteString(0, "===========================================\n");
-	SEGGER_RTT_WriteString(0, "TX CARRIER ACTIVE: Channel 5 (2410 MHz)\n");
-	SEGGER_RTT_WriteString(0, "TX Power: 3 dBm\n");
+	SEGGER_RTT_WriteString(0, "RX MODE ACTIVE: Channel 5 (2410 MHz)\n");
+	SEGGER_RTT_WriteString(0, "Receiver is listening...\n");
 	SEGGER_RTT_WriteString(0, "To stop: Use shell command 'dtm end'\n");
 	SEGGER_RTT_WriteString(0, "===========================================\n");
 	
 	if ((response & 0x8000) == 0x8000) {
-		printk("TX carrier successfully started!\n");
-		SEGGER_RTT_WriteString(0, "SUCCESS: TX carrier is running\n");
+		printk("RX successfully started!\n");
+		SEGGER_RTT_WriteString(0, "SUCCESS: Receiver is running\n");
 	} else {
-		printk("Warning: Unexpected response from TX command\n");
+		printk("Warning: Unexpected response from RX command\n");
 		SEGGER_RTT_WriteString(0, "WARNING: Check response code\n");
 	}
 #endif
@@ -89,10 +81,10 @@ int main(void)
 	uint32_t counter = 0;
 	for (;;) {
 		k_sleep(K_SECONDS(10));
-#if AUTO_START_TX_MODE
+#if AUTO_START_RX_MODE
 		counter += 10;
-		printk("TX carrier active for %u seconds\n", counter);
-		SEGGER_RTT_WriteString(0, "TX carrier still running on channel 5\n");
+		printk("RX active for %u seconds\n", counter);
+		SEGGER_RTT_WriteString(0, "Receiver still listening on channel 5\n");
 #endif
 	}
 }
