@@ -53,10 +53,21 @@ else()
   target_sources_ifdef(CONFIG_DTM_TRANSPORT_HCI app PRIVATE src/transport/hci_uart.c)
 endif()
 
+# RTT transport
+
+target_sources_ifdef(CONFIG_DTM_TRANSPORT_RTT app PRIVATE
+  src/transport/dtm_rtt_twowire.c
+)
+
+# Shared command decoder core
+
+target_sources(app PRIVATE src/transport/dtm_cmd_core.c)
+
 # NORDIC SDK APP START
 target_sources(app PRIVATE
   src/dtm.c
   src/dtm_hw.c
   src/main.c
+  src/dtm_shell_commands.c
 )
 # NORDIC SDK APP END

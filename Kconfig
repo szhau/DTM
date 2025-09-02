@@ -62,6 +62,12 @@ config DTM_TRANSPORT_HCI
 	help
 	  Use the HCI UART transport interface as the DTM transport layer.
 
+config DTM_TRANSPORT_RTT
+	bool "DTM over Two Wire RTT"
+	depends on USE_SEGGER_RTT
+	help
+	  Use SEGGER RTT channel 0 with 2-octet Two-Wire protocol as DTM transport. Enables CLI over RTT instead of UART.
+
 endchoice # DTM_TRANSPORT
 
 if DTM_TRANSPORT_HCI

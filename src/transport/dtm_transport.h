@@ -21,6 +21,11 @@ extern "C" {
 #define H4_TYPE_ISO 0x05
 #endif
 
+/* New transport option */
+#if CONFIG_DTM_TRANSPORT_RTT
+/* No extra macros needed */
+#endif
+
 /** @brief DTM transport packet. */
 union dtm_tr_packet {
 	/** HCI packet buffer. */

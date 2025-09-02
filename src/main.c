@@ -12,9 +12,8 @@
 int main(void)
 {
 	int err;
-	union dtm_tr_packet cmd;
 
-	printk("Starting Direct Test Mode example\n");
+	printk("Starting Direct Test Mode with Shell Interface\n");
 
 	err = dtm_tr_init();
 	if (err) {
@@ -22,12 +21,11 @@ int main(void)
 		return err;
 	}
 
+	printk("DTM Ready - Shell commands available\n");
+	printk("Type 'dtm' to see available commands\n");
+
+	/* Shell runs in background threads, main just sleeps */
 	for (;;) {
-		cmd = dtm_tr_get();
-		err = dtm_tr_process(cmd);
-		if (err) {
-			printk("Error processing command: %d\n", err);
-			return err;
-		}
+		k_sleep(K_SECONDS(1));
 	}
 }

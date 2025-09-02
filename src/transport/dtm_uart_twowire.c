@@ -12,6 +12,7 @@
 
 #include "dtm_uart_wait.h"
 #include "dtm_transport.h"
+#include "dtm_cmd_core.h"
 
 LOG_MODULE_REGISTER(dtm_tw_tr, CONFIG_DTM_TRANSPORT_LOG_LEVEL);
 
@@ -675,6 +676,7 @@ static uint16_t on_test_tx_cmd(uint8_t chan, uint8_t length, enum dtm_pkt_type t
 	return err ? LE_TEST_STATUS_EVENT_ERROR : LE_TEST_STATUS_EVENT_SUCCESS;
 }
 
+#ifndef DTM_CMD_CORE_PRESENT
 static uint16_t dtm_cmd_put(uint16_t cmd)
 {
 	enum dtm_cmd_code cmd_code = (cmd >> 14) & 0x03;
@@ -713,6 +715,7 @@ static uint16_t dtm_cmd_put(uint16_t cmd)
 		return LE_TEST_STATUS_EVENT_ERROR;
 	}
 }
+#endif // DTM_CMD_CORE_PRESENT
 
 int dtm_tr_init(void)
 {
@@ -799,7 +802,11 @@ int dtm_tr_process(union dtm_tr_packet cmd)
 
 	LOG_INF("Processing 0x%04x command", tmp);
 
+#ifdef CONFIG_DTM_TRANSPORT_TWOWIRE
 	ret = dtm_cmd_put(tmp);
+#else
+	ret = dtm_cmd_put(tmp);
+#endif
 	LOG_INF("Sending 0x%04x response", ret);
 
 	uart_poll_out(dtm_uart, (ret >> 8) & 0xFF);
