@@ -232,6 +232,7 @@ static uint16_t on_test_end_cmd(enum dtm_ctrl_code control, uint8_t parameter)
 
 static uint16_t on_test_rx_cmd(uint8_t chan)
 {
+    printk("[DEBUG] DTM RX command: channel %d\n", chan);
     return dtm_test_receive(chan) ? LE_TEST_STATUS_EVENT_ERROR : LE_TEST_STATUS_EVENT_SUCCESS;
 }
 

@@ -14,9 +14,9 @@
 /* External function from dtm_cmd_core */
 extern uint16_t dtm_cmd_put(uint16_t cmd);
 
-/* Set to 1 to enable auto-start RX mode on channel 5 */
+/* Set to 1 to enable auto-start RX mode on channel 4 */
 #define AUTO_START_RX_MODE 1
-#define AUTO_START_CHANNEL 5  /* Channel 5 = 2410 MHz */
+#define AUTO_START_CHANNEL 3  /* Channel 3 = 2410 MHz  */
 
 int main(void)
 {
@@ -41,7 +41,7 @@ int main(void)
 #if AUTO_START_RX_MODE
 	/* Auto-start RX mode */
 	printk("Auto-starting RX on channel %d (%.0f MHz)\n", 
-	       AUTO_START_CHANNEL, 2402.0 + AUTO_START_CHANNEL * 2);
+	       AUTO_START_CHANNEL, 2404.0 + AUTO_START_CHANNEL * 2);
 	
 	/* Wait for system to stabilize */
 	k_sleep(K_MSEC(100));
@@ -58,12 +58,13 @@ int main(void)
 	 * Channel is specified in bits 7-2
 	 */
 	uint16_t rx_cmd = 0x4000 | (AUTO_START_CHANNEL << 2);
+	printk("[DEBUG] Sending RX command: 0x%04X for channel %d\n", rx_cmd, AUTO_START_CHANNEL);
 	response = dtm_cmd_put(rx_cmd);
 	printk("RX started on channel %d (%.0f MHz) - Response: 0x%04X\n", 
-	       AUTO_START_CHANNEL, 2402.0 + AUTO_START_CHANNEL * 2, response);
+	       AUTO_START_CHANNEL, 2404.0 + AUTO_START_CHANNEL * 2, response);
 	
 	SEGGER_RTT_WriteString(0, "===========================================\n");
-	SEGGER_RTT_WriteString(0, "RX MODE ACTIVE: Channel 5 (2410 MHz)\n");
+	SEGGER_RTT_WriteString(0, "RX MODE ACTIVE: Channel 3 (2410 MHz)\n");
 	SEGGER_RTT_WriteString(0, "Receiver is listening...\n");
 	SEGGER_RTT_WriteString(0, "To stop: Use shell command 'dtm end'\n");
 	SEGGER_RTT_WriteString(0, "===========================================\n");
@@ -77,14 +78,22 @@ int main(void)
 	}
 #endif
 
-	/* Shell runs in background threads, main just sleeps */
+	/* Shell runs in background threads, main provides periodic status */
 	uint32_t counter = 0;
+	uint32_t last_status_time = k_uptime_get_32();
+	
 	for (;;) {
-		k_sleep(K_SECONDS(10));
+		k_sleep(K_SECONDS(5));
 #if AUTO_START_RX_MODE
-		counter += 10;
-		printk("RX active for %u seconds\n", counter);
-		SEGGER_RTT_WriteString(0, "Receiver still listening on channel 5\n");
+		counter += 5;
+		uint32_t now = k_uptime_get_32();
+		
+		/* Print periodic status every 5 seconds */
+		printk("\n[STATUS] RX Test Running - %u seconds elapsed\n", counter);
+		printk("         Channel 3 (2410 MHz) - Waiting for packets...\n");
+		
+		/* You could query DTM status here if needed */
+		SEGGER_RTT_WriteString(0, "=== Receiver Active ===\n");
 #endif
 	}
 }

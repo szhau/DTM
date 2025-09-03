@@ -19,6 +19,9 @@
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
 #include <zephyr/sys/__assert.h>
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(dtm, CONFIG_DTM_TRANSPORT_LOG_LEVEL);
 
 #include <hal/nrf_egu.h>
 #include <hal/nrf_nvmc.h>
@@ -339,6 +342,13 @@ static struct dtm_instance {
 
 	/* Number of valid packets received. */
 	uint16_t rx_pkt_count;
+	
+	/* Number of CRC errors during RX test */
+	uint32_t crc_error_count;
+	
+	/* Timestamp for packet rate calculation */
+	uint32_t last_report_time;
+	uint32_t last_report_count;
 
 	/* RX/TX PDU. */
 	struct dtm_pdu pdu[2];
@@ -1914,9 +1924,14 @@ int dtm_test_receive(uint8_t channel)
 		return -EINVAL;
 	}
 
+	printk("[DEBUG] dtm_test_receive: Setting channel to %d\n", channel);
 	dtm_inst.current_pdu = dtm_inst.pdu;
 	dtm_inst.phys_ch = channel;
+	printk("[DEBUG] dtm_inst.phys_ch set to: %d\n", dtm_inst.phys_ch);
 	dtm_inst.rx_pkt_count = 0;
+	dtm_inst.crc_error_count = 0;
+	dtm_inst.last_report_time = k_uptime_get_32();
+	dtm_inst.last_report_count = 0;
 
 	/* Zero fill all pdu fields to avoid stray data from earlier
 	 * test run.
@@ -1927,6 +1942,13 @@ int dtm_test_receive(uint8_t channel)
 	radio_prepare(RX_MODE);
 
 	dtm_inst.state = STATE_RECEIVER_TEST;
+	
+	/* Report RX test start via RTT */
+	printk("\n===== RX Test Started =====\n");
+	printk("Channel: %d (%d MHz)\n", channel, 2402 + channel * 2);
+	printk("Monitoring packets... Updates every 10 packets or 2 seconds\n");
+	printk("[DEBUG] Radio state: %d, Interrupts enabled\n\n", dtm_inst.state);
+	
 	return 0;
 }
 
@@ -2105,6 +2127,12 @@ int dtm_test_transmit(uint8_t channel, uint8_t length, enum dtm_packet pkt)
 	irq_unlock(key);
 
 	dtm_inst.state = STATE_TRANSMITTER_TEST;
+	
+	/* Report TX test start via RTT */
+	printk("\n===== TX Test Started =====\n");
+	printk("Channel: %d (%d MHz)\n", channel, 2402 + channel * 2);
+	printk("Packet length: %d bytes\n", length);
+	printk("Packet type: %d\n\n", pkt);
 
 	return 0;
 }
@@ -2116,6 +2144,20 @@ int dtm_test_end(uint16_t *pack_cnt)
 	}
 
 	*pack_cnt = dtm_inst.rx_pkt_count;
+	
+	/* Report test results via RTT */
+	if (dtm_inst.state == STATE_RECEIVER_TEST) {
+		printk("\n===== RX Test Ended =====\n");
+		printk("Total packets received: %d\n", dtm_inst.rx_pkt_count);
+		printk("Total CRC errors: %d\n", dtm_inst.crc_error_count);
+		printk("Channel: %d (%d MHz)\n\n", 
+				  dtm_inst.phys_ch, 2402 + dtm_inst.phys_ch * 2);
+	} else if (dtm_inst.state == STATE_TRANSMITTER_TEST) {
+		printk("\n===== TX Test Ended =====\n");
+		printk("Channel: %d (%d MHz)\n\n", 
+				  dtm_inst.phys_ch, 2402 + dtm_inst.phys_ch * 2);
+	}
+	
 	dtm_test_done();
 
 	return 0;
@@ -2137,6 +2179,19 @@ static void on_radio_end_event(void)
 {
 	if (dtm_inst.state != STATE_RECEIVER_TEST) {
 		return;
+	}
+	
+	/* Debug: Increment a counter for every END event */
+	static uint32_t end_event_count = 0;
+	static uint32_t last_debug_time = 0;
+	end_event_count++;
+	
+	/* Print debug info every 2 seconds */
+	uint32_t now = k_uptime_get_32();
+	if ((now - last_debug_time) >= 2000) {
+		printk("[DEBUG] Radio END events: %d, State: %d, Ch: %d\n", 
+		       end_event_count, dtm_inst.state, dtm_inst.phys_ch);
+		last_debug_time = now;
 	}
 
 	struct dtm_pdu *received_pdu = radio_buffer_swap();
@@ -2166,12 +2221,77 @@ static void on_radio_end_event(void)
 	}
 #endif /* NRF52_ERRATA_172_PRESENT */
 
-	if (nrf_radio_crc_status_check(NRF_RADIO) &&
-	    check_pdu(received_pdu)) {
+	/* Debug: Check if we're getting here */
+	bool crc_ok = nrf_radio_crc_status_check(NRF_RADIO);
+	bool pdu_ok = false;
+	if (crc_ok) {
+		pdu_ok = check_pdu(received_pdu);
+	}
+	
+	if (crc_ok && pdu_ok) {
 		/* Count the number of successfully received
 		 * packets.
 		 */
 		dtm_inst.rx_pkt_count++;
+		
+		/* Get current time and RSSI */
+		uint32_t now = k_uptime_get_32();
+		/* RSSI must be sampled after packet reception, get the actual value */
+		nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RSSISTART);
+		while (!nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND)) {
+			/* Wait for RSSI measurement */
+		}
+		int8_t rssi = -(int8_t)nrf_radio_rssi_sample_get(NRF_RADIO);
+		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND);
+		
+		/* Print summary every 10 packets or every 2 seconds */
+		bool should_report = (dtm_inst.rx_pkt_count % 10 == 0) ||
+				     ((now - dtm_inst.last_report_time) >= 2000);
+		
+		/* Also report if this is the first packet */
+		if (dtm_inst.rx_pkt_count == 1) {
+			should_report = true;
+			printk("[DEBUG] First packet received!\n");
+		}
+		
+		if (should_report) {
+			/* Calculate packet rate if time has elapsed */
+			if ((now - dtm_inst.last_report_time) >= 1000) {
+				uint32_t time_diff_ms = now - dtm_inst.last_report_time;
+				uint32_t pkt_diff = dtm_inst.rx_pkt_count - dtm_inst.last_report_count;
+				uint32_t pkt_per_sec = (pkt_diff * 1000) / time_diff_ms;
+				
+				printk("[RX] Ch:%02d | Total:%5d | Rate:%4d pkt/s | RSSI:%3d dBm | Errors:%d\n", 
+						  dtm_inst.phys_ch, dtm_inst.rx_pkt_count, 
+						  pkt_per_sec, rssi, dtm_inst.crc_error_count);
+				
+				dtm_inst.last_report_time = now;
+				dtm_inst.last_report_count = dtm_inst.rx_pkt_count;
+			} else {
+				/* Just packet count update */
+				printk("[RX] Ch:%02d | Total:%5d | RSSI:%3d dBm | Errors:%d\n", 
+						  dtm_inst.phys_ch, dtm_inst.rx_pkt_count, 
+						  rssi, dtm_inst.crc_error_count);
+			}
+		}
+	} else {
+		/* Count CRC errors */
+		if (!nrf_radio_crc_status_check(NRF_RADIO)) {
+			dtm_inst.crc_error_count++;
+			
+			/* Report first few CRC errors for debugging */
+			if (dtm_inst.crc_error_count <= 5) {
+				/* Get RSSI for CRC error */
+				nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RSSISTART);
+				while (!nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND)) {
+					/* Wait */
+				}
+				int8_t rssi = -(int8_t)nrf_radio_rssi_sample_get(NRF_RADIO);
+				nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_RSSIEND);
+				printk("[RX] Ch:%02d | CRC ERROR #%d | RSSI:%3d dBm\n", 
+				       dtm_inst.phys_ch, dtm_inst.crc_error_count, rssi);
+			}
+		}
 	}
 
 	/* Note that failing packets are simply ignored (CRC or
@@ -2184,6 +2304,13 @@ static void on_radio_end_event(void)
 
 static void radio_handler(const void *context)
 {
+	/* Debug counter for handler calls */
+	static uint32_t handler_count = 0;
+	handler_count++;
+	if (handler_count % 1000 == 0) {
+		printk("[DEBUG] Radio handler called %d times\n", handler_count);
+	}
+	
 	if (nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_ADDRESS)) {
 		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_ADDRESS);
 #if NRF52_ERRATA_172_PRESENT

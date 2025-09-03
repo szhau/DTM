@@ -1,60 +1,123 @@
 # DTM RTT Usage Guide
 
 ## Overview
-Direct Test Mode (DTM) uses raw 2-byte commands, not shell commands. It communicates over RTT channel 0.
+Direct Test Mode (DTM) with RTT transport provides both:
+1. Shell commands for easy testing
+2. Real-time packet reception output via RTT
 
 ## RTT Channel Layout
-- **Channel 0**: DTM command/response (2-byte protocol)
-- **Channel 1**: Log output
+- **Channel 0**: DTM shell commands and packet reception output
+- **Channel 1**: Log output (if needed)
 
-## How to Use DTM over RTT
+## Real-Time Packet Reception Output
 
-### 1. Connect with J-Link RTT Viewer
+When running RX tests, the system provides dynamic, real-time packet statistics via RTT, similar to nRF Connect for Desktop's Direct Test Mode interface:
+
+### RX Test Output Features
+- **Test Start Notification**: Shows channel and frequency
+- **Dynamic Updates**: Statistics update every 10 packets or 2 seconds
+- **Real-Time Statistics**: 
+  - Channel number
+  - Total packet count
+  - Packet rate (packets/second)
+  - RSSI value in dBm
+  - CRC error count
+- **Test Summary**: Final statistics when test ends
+
+### Example RX Test Output
+```
+===== RX Test Started =====
+Channel: 20 (2440 MHz)
+Monitoring packets... Updates every 10 packets or 2 seconds
+
+[RX] Ch:20 | Total:   10 | RSSI:-45 dBm | Errors:0
+[RX] Ch:20 | Total:   20 | RSSI:-44 dBm | Errors:1
+[RX] Ch:20 | Total:   42 | Rate: 625 pkt/s | RSSI:-46 dBm | Errors:2
+[RX] Ch:20 | Total:   87 | Rate: 620 pkt/s | RSSI:-45 dBm | Errors:2
+[RX] Ch:20 | Total:  156 | Rate: 625 pkt/s | RSSI:-44 dBm | Errors:3
+
+===== RX Test Ended =====
+Total packets received: 156
+Total CRC errors: 3
+Channel: 20 (2440 MHz)
+```
+
+## Shell Commands via RTT
+
+### Basic Commands
+```bash
+dtm reset                    # Reset DTM to initial state
+dtm rx_test <channel>        # Start RX test (0-39)
+dtm tx_carrier <channel>     # Start continuous TX carrier
+dtm tx_test <ch> [len]       # Start modulated TX test
+dtm tx_power <dBm>          # Set TX power
+dtm end                      # End test and show packet count
+dtm raw <hex>               # Send raw 2-byte DTM command
+```
+
+### Usage Examples
+
+#### Start RX Test and Monitor Packets
+```bash
+# Start receiving on channel 20 (2440 MHz)
+dtm rx_test 20
+# Watch RTT output for real-time packet info
+# ...
+dtm end
+# Shows: End Test - Response: 0x8XXX
+#        Packets received: XXX
+```
+
+#### EMC Receiver Spurious Emissions Test
+```bash
+# Set desired channel for emissions testing
+dtm rx_test 20
+# Receiver and LO run continuously
+# Measure with spectrum analyzer
+# ...
+dtm end
+```
+
+#### TX Carrier for EMC Testing
+```bash
+dtm tx_power 8      # Set to 8 dBm
+dtm tx_carrier 20   # Start carrier on 2440 MHz
+# Measure with spectrum analyzer
+dtm end
+```
+
+## Connecting via J-Link RTT
+
+### Option 1: RTT Viewer (GUI)
 ```
 JLinkRTTViewer.exe
 ```
-- Select your target device
-- Connect to the board
+- Select target device (nRF5340_xxAA_NET)
+- Connect to board
+- Type commands in Terminal 0
 
-### 2. Send DTM Commands
-DTM expects 2-byte commands in the format:
-- Byte 1 (MSB): Command type and upper bits
-- Byte 2 (LSB): Parameters
+### Option 2: RTT Client (CLI)
+```bash
+JLinkRTTClient
+```
+- Connects automatically if J-Link is running
+- Type commands directly
 
-### Common DTM Commands (2-byte hex values)
+## Channel Frequency Mapping
+| Channel | Frequency | Channel | Frequency |
+|---------|-----------|---------|-----------|
+| 0       | 2402 MHz  | 20      | 2440 MHz  |
+| 10      | 2420 MHz  | 30      | 2460 MHz  |
+| 19      | 2438 MHz  | 39      | 2480 MHz  |
 
-#### Reset/Stop Test
-- `0x00 0x00` - Reset DTM
+Formula: Frequency (MHz) = 2402 + (channel × 2)
 
-#### Receiver Test
-- `0x80 0x00` - Start RX test on channel 0 (2402 MHz)
-- `0x80 0x27` - Start RX test on channel 39 (2480 MHz)
+## Benefits Over UART
+- No physical UART pins needed
+- Real-time packet reception monitoring
+- Works with custom boards without UART
+- Shell commands for easier testing
+- Compatible with DTM protocol specifications
 
-#### Transmitter Test  
-- `0xC0 0x00` - Start TX carrier on channel 0
-- `0xC0 0x27` - Start TX carrier on channel 39
-
-#### Set TX Power
-- `0x02 0x09` - Set TX power (vendor specific)
-
-#### End Test
-- `0x00 0x00` - End test
-
-### 3. View Responses
-DTM sends 2-byte responses back on RTT channel 0:
-- `0x00 0x00` - Success/ACK
-- `0x00 0x01` - Error/NACK
-
-### 4. View Logs
-Switch to RTT channel 1 to see debug logs
-
-## Testing Receiver Spurious Emissions
-For EMC testing (EN 300 328 / EN 301 893):
-1. Send RX start command: `0x80 0x14` (channel 20, 2440 MHz)
-2. Receiver and LO will run continuously
-3. Measure spurious emissions with spectrum analyzer
-4. Send reset command: `0x00 0x00` to stop
-
-## Note
-This is NOT a shell interface. You need to send raw hex bytes to RTT channel 0.
-Some RTT viewers allow sending hex data directly.
+## Note for nRF Connect Desktop
+While nRF Connect for Desktop's Direct Test Mode app expects UART, this RTT implementation provides equivalent functionality with enhanced debugging via real-time packet output. The packet count reporting follows standard DTM protocol (0x8XXX response format).

@@ -122,6 +122,13 @@ static int cmd_dtm_end_test(const struct shell *sh, size_t argc, char **argv)
 {
 	uint16_t response = dtm_cmd_put(0xC000);
 	shell_print(sh, "End Test - Response: 0x%04X", response);
+	
+	/* Extract packet count from response if it's a packet reporting event */
+	if (response & 0x8000) {
+		uint16_t packet_count = response & 0x7FFF;
+		shell_print(sh, "  Packets received: %d", packet_count);
+	}
+	
 	return 0;
 }
 
