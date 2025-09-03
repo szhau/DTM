@@ -23,6 +23,8 @@
 
 LOG_MODULE_DECLARE(dtm, CONFIG_DTM_TRANSPORT_LOG_LEVEL);
 
+#include "emc_config.h"
+
 #include <hal/nrf_egu.h>
 #include <hal/nrf_nvmc.h>
 #include <hal/nrf_radio.h>
@@ -1924,10 +1926,14 @@ int dtm_test_receive(uint8_t channel)
 		return -EINVAL;
 	}
 
+#ifndef EMC_TEST_MODE
 	printk("[DEBUG] dtm_test_receive: Setting channel to %d\n", channel);
+#endif
 	dtm_inst.current_pdu = dtm_inst.pdu;
 	dtm_inst.phys_ch = channel;
+#ifndef EMC_TEST_MODE
 	printk("[DEBUG] dtm_inst.phys_ch set to: %d\n", dtm_inst.phys_ch);
+#endif
 	dtm_inst.rx_pkt_count = 0;
 	dtm_inst.crc_error_count = 0;
 	dtm_inst.last_report_time = k_uptime_get_32();
@@ -1943,11 +1949,13 @@ int dtm_test_receive(uint8_t channel)
 
 	dtm_inst.state = STATE_RECEIVER_TEST;
 	
-	/* Report RX test start via RTT */
+	/* Report RX test start via RTT - only in debug mode */
+#ifndef EMC_TEST_MODE
 	printk("\n===== RX Test Started =====\n");
-	printk("Channel: %d (%d MHz)\n", channel, 2402 + channel * 2);
+	printk("Channel: %d (%d MHz)\n", channel, 2404 + channel * 2);
 	printk("Monitoring packets... Updates every 10 packets or 2 seconds\n");
 	printk("[DEBUG] Radio state: %d, Interrupts enabled\n\n", dtm_inst.state);
+#endif
 	
 	return 0;
 }
@@ -2130,7 +2138,7 @@ int dtm_test_transmit(uint8_t channel, uint8_t length, enum dtm_packet pkt)
 	
 	/* Report TX test start via RTT */
 	printk("\n===== TX Test Started =====\n");
-	printk("Channel: %d (%d MHz)\n", channel, 2402 + channel * 2);
+	printk("Channel: %d (%d MHz)\n", channel, 2404 + channel * 2);
 	printk("Packet length: %d bytes\n", length);
 	printk("Packet type: %d\n\n", pkt);
 
@@ -2151,11 +2159,11 @@ int dtm_test_end(uint16_t *pack_cnt)
 		printk("Total packets received: %d\n", dtm_inst.rx_pkt_count);
 		printk("Total CRC errors: %d\n", dtm_inst.crc_error_count);
 		printk("Channel: %d (%d MHz)\n\n", 
-				  dtm_inst.phys_ch, 2402 + dtm_inst.phys_ch * 2);
+				  dtm_inst.phys_ch, 2404 + dtm_inst.phys_ch * 2);
 	} else if (dtm_inst.state == STATE_TRANSMITTER_TEST) {
 		printk("\n===== TX Test Ended =====\n");
 		printk("Channel: %d (%d MHz)\n\n", 
-				  dtm_inst.phys_ch, 2402 + dtm_inst.phys_ch * 2);
+				  dtm_inst.phys_ch, 2404 + dtm_inst.phys_ch * 2);
 	}
 	
 	dtm_test_done();
@@ -2187,12 +2195,14 @@ static void on_radio_end_event(void)
 	end_event_count++;
 	
 	/* Print debug info every 2 seconds */
+	#if !EMC_TEST_MODE
 	uint32_t now = k_uptime_get_32();
 	if ((now - last_debug_time) >= 2000) {
 		printk("[DEBUG] Radio END events: %d, State: %d, Ch: %d\n", 
 		       end_event_count, dtm_inst.state, dtm_inst.phys_ch);
 		last_debug_time = now;
 	}
+	#endif
 
 	struct dtm_pdu *received_pdu = radio_buffer_swap();
 
@@ -2248,6 +2258,8 @@ static void on_radio_end_event(void)
 		bool should_report = (dtm_inst.rx_pkt_count % 10 == 0) ||
 				     ((now - dtm_inst.last_report_time) >= 2000);
 		
+		/* Packet reporting - only in debug mode to avoid EMI during EMC testing */
+#ifndef EMC_TEST_MODE
 		/* Also report if this is the first packet */
 		if (dtm_inst.rx_pkt_count == 1) {
 			should_report = true;
@@ -2274,12 +2286,14 @@ static void on_radio_end_event(void)
 						  rssi, dtm_inst.crc_error_count);
 			}
 		}
+#endif
 	} else {
 		/* Count CRC errors */
 		if (!nrf_radio_crc_status_check(NRF_RADIO)) {
 			dtm_inst.crc_error_count++;
 			
-			/* Report first few CRC errors for debugging */
+			/* Report first few CRC errors for debugging - only in debug mode */
+#ifndef EMC_TEST_MODE
 			if (dtm_inst.crc_error_count <= 5) {
 				/* Get RSSI for CRC error */
 				nrf_radio_task_trigger(NRF_RADIO, NRF_RADIO_TASK_RSSISTART);
@@ -2291,6 +2305,7 @@ static void on_radio_end_event(void)
 				printk("[RX] Ch:%02d | CRC ERROR #%d | RSSI:%3d dBm\n", 
 				       dtm_inst.phys_ch, dtm_inst.crc_error_count, rssi);
 			}
+#endif
 		}
 	}
 
@@ -2304,12 +2319,14 @@ static void on_radio_end_event(void)
 
 static void radio_handler(const void *context)
 {
-	/* Debug counter for handler calls */
+	/* Debug counter for handler calls - only in debug mode */
+#ifndef EMC_TEST_MODE
 	static uint32_t handler_count = 0;
 	handler_count++;
 	if (handler_count % 1000 == 0) {
 		printk("[DEBUG] Radio handler called %d times\n", handler_count);
 	}
+#endif
 	
 	if (nrf_radio_event_check(NRF_RADIO, NRF_RADIO_EVENT_ADDRESS)) {
 		nrf_radio_event_clear(NRF_RADIO, NRF_RADIO_EVENT_ADDRESS);

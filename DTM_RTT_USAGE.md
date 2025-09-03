@@ -106,11 +106,11 @@ JLinkRTTClient
 ## Channel Frequency Mapping
 | Channel | Frequency | Channel | Frequency |
 |---------|-----------|---------|-----------|
-| 0       | 2402 MHz  | 20      | 2440 MHz  |
-| 10      | 2420 MHz  | 30      | 2460 MHz  |
-| 19      | 2438 MHz  | 39      | 2480 MHz  |
+| 0       | 2404 MHz  | 20      | 2444 MHz  |
+| 10      | 2424 MHz  | 30      | 2464 MHz  |
+| 19      | 2442 MHz  | 39      | 2482 MHz  |
 
-Formula: Frequency (MHz) = 2402 + (channel × 2)
+Formula: Frequency (MHz) = 2404 + (channel × 2)
 
 ## Benefits Over UART
 - No physical UART pins needed

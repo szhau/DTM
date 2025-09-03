@@ -22,7 +22,7 @@ static int cmd_dtm_rx_test(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc != 2) {
 		shell_print(sh, "Usage: rx_test <channel>");
-		shell_print(sh, "  channel: 0-39 (2402-2480 MHz)");
+		shell_print(sh, "  channel: 0-39 (2404-2482 MHz)");
 		return -EINVAL;
 	}
 	
@@ -38,7 +38,7 @@ static int cmd_dtm_rx_test(const struct shell *sh, size_t argc, char **argv)
 	uint16_t cmd = 0x4000 | (channel << 2);  /* 0x4000 = LE_RECEIVER_TEST */
 	uint16_t response = dtm_cmd_put(cmd);
 	shell_print(sh, "RX Test on channel %d (%.0f MHz) - Response: 0x%04X", 
-	            channel, 2402.0 + channel * 2, response);
+	            channel, 2404.0 + channel * 2, response);
 	return 0;
 }
 
@@ -46,7 +46,7 @@ static int cmd_dtm_tx_carrier(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc != 2) {
 		shell_print(sh, "Usage: tx_carrier <channel>");
-		shell_print(sh, "  channel: 0-39 (2402-2480 MHz)");
+		shell_print(sh, "  channel: 0-39 (2404-2482 MHz)");
 		return -EINVAL;
 	}
 	
@@ -63,7 +63,7 @@ static int cmd_dtm_tx_carrier(const struct shell *sh, size_t argc, char **argv)
 	uint16_t cmd = 0x8000 | (channel << 2);  /* 0x8000 = LE_TRANSMITTER_TEST */
 	uint16_t response = dtm_cmd_put(cmd);
 	shell_print(sh, "TX Carrier on channel %d (%.0f MHz) - Response: 0x%04X", 
-	            channel, 2402.0 + channel * 2, response);
+	            channel, 2404.0 + channel * 2, response);
 	return 0;
 }
 
@@ -71,7 +71,7 @@ static int cmd_dtm_tx_test(const struct shell *sh, size_t argc, char **argv)
 {
 	if (argc != 2 && argc != 3) {
 		shell_print(sh, "Usage: tx_test <channel> [length]");
-		shell_print(sh, "  channel: 0-39 (2402-2480 MHz)");
+		shell_print(sh, "  channel: 0-39 (2404-2482 MHz)");
 		shell_print(sh, "  length: packet length 0-37 (default 37)");
 		return -EINVAL;
 	}
