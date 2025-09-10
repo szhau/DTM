@@ -34,7 +34,7 @@ int main(void)
 	printk("Type 'dtm' to see available commands\n");
 #endif
 
-#if AUTO_START_RX_MODE
+#if AUTO_START_TX_MODE
 	/* Wait for system to stabilize */
 	k_sleep(K_MSEC(100));
 	
@@ -46,19 +46,21 @@ int main(void)
 	
 	k_sleep(K_MSEC(50));
 	
-	/* Start RX on configured channel
-	 * RX command: bits 15-14 = 0x1 (RECEIVER_TEST)
-	 * Channel is specified in bits 7-2
+	/* Start TX carrier on configured channel
+	 * TX command: bits 15-14 = 0x2 (TRANSMITTER_TEST)
+	 * Channel is specified in bits 13-8
+	 * Length = 0x25 (37 bytes) in bits 7-2 for carrier test
+	 * Packet type = 0x0 (PRBS9) in bits 1-0
 	 */
-	uint16_t rx_cmd = 0x4000 | (AUTO_START_CHANNEL << 2);
-	response = dtm_cmd_put(rx_cmd);
+	uint16_t tx_cmd = 0x8000 | (AUTO_START_CHANNEL << 8) | (0x25 << 2) | 0x0;
+	response = dtm_cmd_put(tx_cmd);
 	
 #if !EMC_TEST_MODE
-	printk("Auto-starting RX on channel %d (%d MHz)\n", 
-	       AUTO_START_CHANNEL, 2404 + AUTO_START_CHANNEL * 2);
-	printk("RX started - Response: 0x%04X\n", response);
+	printk("Auto-starting TX carrier on channel %d (%d MHz)\n", 
+	       AUTO_START_CHANNEL, 2402 + AUTO_START_CHANNEL * 2);
+	printk("TX started - Response: 0x%04X\n", response);
 	if ((response & 0x8000) != 0x8000) {
-		printk("Warning: Unexpected response from RX command\n");
+		printk("Warning: Unexpected response from TX command\n");
 	}
 #endif
 #endif
@@ -71,11 +73,11 @@ int main(void)
 #else
 		/* Debug Mode: Periodic status updates */
 		k_sleep(K_SECONDS(5));
-#if AUTO_START_RX_MODE
+#if AUTO_START_TX_MODE
 		static uint32_t counter = 0;
 		counter += 5;
-		printk("\n[STATUS] RX Test Running - %u seconds elapsed\n", counter);
-		printk("         Channel %d (%d MHz) - Waiting for packets...\n", 
+		printk("\n[STATUS] TX Test Running - %u seconds elapsed\n", counter);
+		printk("         Channel %d (%d MHz) - Transmitting carrier...\n", 
 		       AUTO_START_CHANNEL, 2404 + AUTO_START_CHANNEL * 2);
 #endif
 #endif

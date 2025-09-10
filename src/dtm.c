@@ -1952,7 +1952,7 @@ int dtm_test_receive(uint8_t channel)
 	/* Report RX test start via RTT - only in debug mode */
 #ifndef EMC_TEST_MODE
 	printk("\n===== RX Test Started =====\n");
-	printk("Channel: %d (%d MHz)\n", channel, 2404 + channel * 2);
+	printk("Channel: %d (%d MHz)\n", channel, 2402 + channel * 2);
 	printk("Monitoring packets... Updates every 10 packets or 2 seconds\n");
 	printk("[DEBUG] Radio state: %d, Interrupts enabled\n\n", dtm_inst.state);
 #endif
@@ -2138,7 +2138,7 @@ int dtm_test_transmit(uint8_t channel, uint8_t length, enum dtm_packet pkt)
 	
 	/* Report TX test start via RTT */
 	printk("\n===== TX Test Started =====\n");
-	printk("Channel: %d (%d MHz)\n", channel, 2404 + channel * 2);
+	printk("Channel: %d (%d MHz)\n", channel, 2402 + channel * 2);
 	printk("Packet length: %d bytes\n", length);
 	printk("Packet type: %d\n\n", pkt);
 
@@ -2159,11 +2159,11 @@ int dtm_test_end(uint16_t *pack_cnt)
 		printk("Total packets received: %d\n", dtm_inst.rx_pkt_count);
 		printk("Total CRC errors: %d\n", dtm_inst.crc_error_count);
 		printk("Channel: %d (%d MHz)\n\n", 
-				  dtm_inst.phys_ch, 2404 + dtm_inst.phys_ch * 2);
+				  dtm_inst.phys_ch, 2402 + dtm_inst.phys_ch * 2);
 	} else if (dtm_inst.state == STATE_TRANSMITTER_TEST) {
 		printk("\n===== TX Test Ended =====\n");
 		printk("Channel: %d (%d MHz)\n\n", 
-				  dtm_inst.phys_ch, 2404 + dtm_inst.phys_ch * 2);
+				  dtm_inst.phys_ch, 2402 + dtm_inst.phys_ch * 2);
 	}
 	
 	dtm_test_done();
